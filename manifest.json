@@ -33,6 +33,15 @@
                     "fr": "Choisissez un domaine pour Jitsi Meet"
                 },
                 "example": "domain.org"
+            },
+            {
+                "name": "installjigasi",
+                "optional": "true",
+                "ask": {
+                    "en": "Add the Jigasi SIP gateway?",
+                    "fr": "Ajouter la passerelle SIP Jigasi ?"
+                },
+                "default": false
             }
         ]
     }
