@@ -1,0 +1,7 @@
+ 
+SOURCE_URL=https://github.com/jitsi/jigasi/archive/master.zip
+SOURCE_SUM=eb20ca6b81697d409fbb393e97fb1f8516b4d0e9d99c04e9f467fa1f1f89fccf
+SOURCE_SUM_PRG=sha256sum
+SOURCE_FORMAT=zip
+SOURCE_IN_SUBDIR=true
+SOURCE_FILENAME=
