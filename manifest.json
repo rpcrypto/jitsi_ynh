@@ -36,12 +36,11 @@
             },
             {
                 "name": "installjigasi",
-                "optional": "true",
+                "type": "boolean",
                 "ask": {
                     "en": "Add the Jigasi SIP gateway?",
                     "fr": "Ajouter la passerelle SIP Jigasi ?"
-                },
-                "default": false
+                }
             }
         ]
     }
