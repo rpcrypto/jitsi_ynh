@@ -36,8 +36,12 @@ focus_password=$(ynh_string_random --length=8)
 videobridge_secret=$(ynh_string_random --length=8)
 #YOURSECRET2
 focus_secret=$(ynh_string_random --length=8)
+#YOURSECRET4
+jigasi_secret=$(ynh_string_random --length=8)
 
 focus_user="svc${app}focus"
+
+jigasi_subdomain="sipgw"
 
 #=================================================
 # CHECK IF THE APP CAN BE INSTALLED WITH THESE ARGS
@@ -61,6 +65,7 @@ ynh_app_setting_set --app=$app --key=focus_password --value=$focus_password
 ynh_app_setting_set --app=$app --key=videobridge_secret --value=$videobridge_secret
 ynh_app_setting_set --app=$app --key=focus_secret --value=$focus_secret
 ynh_app_setting_set --app=$app --key=focus_user --value=$focus_user
+ynh_app_setting_set --app=$app --key=focus_secret --value=$jigasi_secret
 
 #=================================================
 # STANDARD MODIFICATIONS
@@ -103,6 +108,7 @@ ynh_print_info --message="Setting up source files..."
 
 ynh_app_setting_set --app=$app --key=final_path --value=$final_path
 # Download, check integrity, uncompress and patch the source from app.src
+ynh_setup_source --dest_dir="$final_path/jigasi-build" --source_id=jitsi-jigasi
 ynh_setup_source --dest_dir="$final_path/jitsi-videobridge" --source_id=jitsi-videobridge
 ynh_setup_source --dest_dir="$final_path/jitsi-jicofo-build" --source_id=jitsi-jicofo
 ynh_setup_source --dest_dir="$final_path/jitsi-meet_temp" --source_id=jitsi-meet
@@ -137,6 +143,7 @@ if [ ${PACKAGE_CHECK_EXEC:-0} -eq 1 ]; then
 	yunohost domain add conference.$domain
 	yunohost domain add jitsi-videobridge.$domain
 	yunohost domain add focus.$domain
+	yunohost domain add sipgw.$domain
 fi
 
 # Create focus user
@@ -151,11 +158,14 @@ ynh_replace_string --match_string="__APP__" --replace_string="$app" --target_fil
 ynh_replace_string --match_string="__VIDEOBRIDGE_SECRET__" --replace_string="$videobridge_secret" --target_file="$metronome_conf"
 ynh_replace_string --match_string="__FOCUS_SECRET__" --replace_string="$focus_secret" --target_file="$metronome_conf"
 ynh_replace_string --match_string="__PORT_COMPONENT__" --replace_string="$port_component" --target_file="$metronome_conf"
+ynh_replace_string --match_string="__JIGASI_SECRET__" --replace_string="$jigasi_secret" --target_file="$metronome_conf"
+ynh_replace_string --match_string="__JIGASI_SUBDOMAIN__" --replace_string="$jigasi_subdomain" --target_file="$metronome_conf"
 
 touch "/usr/share/yunohost/templates/jitsi/auth.$domain.cfg.lua"
 touch "/usr/share/yunohost/templates/jitsi/conference.$domain.cfg.lua"
 touch "/usr/share/yunohost/templates/jitsi/jitsi-videobridge.$domain.cfg.lua"
 touch "/usr/share/yunohost/templates/jitsi/focus.$domain.cfg.lua"
+touch "/usr/share/yunohost/templates/jitsi/jitsi-jigasi.$domain.cfg.lua"
 
 # Add Metronome hook 
 cp -R ../conf/metronome_regen_conf.hook /usr/share/yunohost/hooks/conf_regen/50-metronome_$app
@@ -194,6 +204,21 @@ mv $final_path/jicofo-linux-x64-1.1-SNAPSHOT/ $final_path/jitsi-jicofo/
 ynh_secure_remove --file="$final_path/jitsi-jicofo-build"
 
 #=================================================
+# BUILD JITSI-JIGASI
+#=================================================
+ynh_print_info --message="Building Jitsi-Jigasi..."
+
+pushd "$final_path/jigasi-build"
+    mvn package -DskipTests -Dassembly.skipAssembly=false
+popd
+
+unzip $final_path/jigasi-build/target/jigasi-linux-x64-1.1-SNAPSHOT.zip -d $final_path
+
+mv $final_path/jigasi-linux-x64-1.1-SNAPSHOT/ $final_path/jitsi-jigasi/
+
+ynh_secure_remove --file="$final_path/jigasi-build"
+
+#=================================================
 # BUILD JITSI-MEET
 #=================================================
 ynh_print_info --message="Building Jitsi-Meet..."
@@ -226,6 +251,11 @@ ynh_replace_string --match_string="__FOCUS_SECRET__" --replace_string="$focus_se
 ynh_replace_string --match_string="__FOCUS_USER__" --replace_string="$focus_user" --target_file="../conf/jitsi-jicofo.service"
 ynh_replace_string --match_string="__FOCUS_PASSWORD__" --replace_string="$focus_password" --target_file="../conf/jitsi-jicofo.service"
 ynh_add_systemd_config --service=$app-jicofo --template="jitsi-jicofo.service"
+
+ynh_replace_string --match_string="__DOMAIN__" --replace_string="$domain" --target_file="../conf/jitsi-jigasi.service"
+ynh_replace_string --match_string="__JIGASI_SECRET__" --replace_string="$jigasi_secret" --target_file="../conf/jitsi-jigasi.service"
+ynh_replace_string --match_string="__JIGASI_SUBDOMAIN__" --replace_string="$jigasi_subdomain" --target_file="../conf/jitsi-jigasi.service"
+ynh_add_systemd_config --service=$app-jigasi --template="jitsi-jigasi.service"
 
 #=================================================
 # STORE THE CONFIG FILE CHECKSUM
@@ -260,6 +290,7 @@ ynh_print_info --message="Integrating service in YunoHost..."
 
 yunohost service add $app-videobridge --description "$app jitsi-videobridge for jitsi" --log "/var/log/$app/$app-videobridge.log"
 yunohost service add $app-jicofo --description "$app jitsi-jicofo for jitsi" --log "/var/log/$app/$app-jicofo.log"
+yunohost service add $app-jigasi --description "$app jitsi-jigasi for jitsi" --log "/var/log/$app/$app-jigasi.log"
 
 #=================================================
 # START SYSTEMD SERVICE
@@ -269,6 +300,7 @@ ynh_print_info --message="Starting a systemd service..."
 # Start a systemd service
 ynh_systemd_action --service_name=$app-videobridge --action="start" --log_path="/var/log/$app/$app-videobridge.log"
 ynh_systemd_action --service_name=$app-jicofo --action="start" --log_path="/var/log/$app/$app-jicofo.log"
+ynh_systemd_action --service_name=$app-jigasi --action="start" --log_path="/var/log/$app/$app-jigasi.log"
 
 #=================================================
 # SETUP SSOWAT
